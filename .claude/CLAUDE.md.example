@@ -1,0 +1,16 @@
+# CLAUDE.md 配置示例
+
+将此内容添加到项目的 `.claude/CLAUDE.md` 或项目根目录的 `CLAUDE.md` 中，确保 Claude 在每次新会话启动时提醒续接项目。
+
+## 添加以下内容到你的 CLAUDE.md：
+
+```markdown
+## 跨会话项目续接
+
+本目录下 `.claude/projects/` 中存有活跃项目状态文件。
+
+**新会话启动时**：扫描 `.claude/projects/*.yaml`，如果存在活跃项目文件，提示用户：
+"检测到活跃项目 [项目名]，输入 `/project` 继续。"
+
+注意：此规则仅作提醒。项目续接必须由用户显式输入 `/project` 触发。
+```

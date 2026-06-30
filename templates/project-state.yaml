@@ -1,0 +1,43 @@
+# ============================================================
+# /project 状态文件模板
+# 复制此文件为 .claude/projects/<你的项目名>.yaml
+# ============================================================
+
+name: my-project
+created: 2026-06-30
+
+# ── 项目背景（每次 /project 都会加载此段）──
+# 写清楚：要做什么、关键决策、约束条件。控制在 200 字以内。
+context: |
+  项目的一句话定位。
+
+  核心决策：
+  1. 决定A — 原因
+  2. 决定B — 原因
+
+  约束：时间/技术/资源的限制。
+
+# ── 步骤定义（DAG）──
+# status: done | in_progress | blocked | pending
+# deps: 依赖的步骤 id 列表，全部 done 后本步骤才可开始
+# outputs: 产出文件的相对路径列表
+# summary: 完成后的一句话摘要
+steps:
+  - id: step-1
+    name: 步骤名称
+    status: pending
+    deps: []
+    outputs: []
+    summary: ""
+
+  - id: step-2
+    name: 另一个步骤
+    status: pending
+    deps: [step-1]          # ← 依赖步骤1完成
+    outputs: []
+    summary: ""
+
+# ── 会话记录 ──
+sessions:
+  # - date: 2026-06-30
+  #   summary: 做了什么 + 产出 + 下次从哪开始
