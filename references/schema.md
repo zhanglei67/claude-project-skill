@@ -54,47 +54,58 @@ pending ──→ in_progress ──→ done
 ## 完整示例
 
 ```yaml
-name: shop-global
-created: 2026-06-29
+name: admin-refactor
+created: 2026-07-02
 context: |
-  电商平台多语言多币种改造。
-  决策：i18next+ICU 框架，Stripe+Adyen 支付。
-  约束：首屏增量 <200ms，先东南亚后欧洲。
+  后台管理系统渐进式重构。
+  决策：React 18 + TypeScript 严格模式，Zustand 替代老 Redux。
+  约束：不能中断业务，每次只迁移一个模块。
 
 steps:
   - id: step-1
-    name: 国际化方案调研
+    name: 现状分析+技术选型
     status: done
     deps: []
-    outputs: ["docs/i18n-survey.md"]
-    summary: "i18next+ICU 选型，12 个框架对比"
+    outputs: ["docs/admin-refactor/analysis.md"]
+    summary: "梳理 47 个页面，12 个公共组件。选型 React 18 + Zustand"
 
   - id: step-2
-    name: 支付渠道整合
+    name: 公共组件抽离
     status: done
     deps: []
-    outputs: ["docs/payment-integration.md"]
-    summary: "Stripe+Adyen 双通道，PCI DSS Level 1"
+    outputs: ["src/components/common/"]
+    summary: "抽离 12 个公共组件，编写单元测试"
 
   - id: step-3
-    name: 汇率结算逻辑
-    status: blocked
-    deps: [step-2]
-    outputs: ["docs/fx-settlement.md"]
-    summary: ""
+    name: 用户管理模块迁移
+    status: done
+    deps: []
+    outputs: ["src/pages/user/"]
+    summary: "用户列表/详情/权限分配 3 页面迁移完成"
 
   - id: step-4
-    name: 架构设计
+    name: 数据报表模块迁移
     status: blocked
-    deps: [step-1, step-2, step-3]
-    outputs: ["docs/architecture.md"]
-    summary: ""
+    deps: []
+    outputs: ["src/pages/report/"]
+
+  - id: step-5
+    name: 全局状态管理迁移
+    status: blocked
+    deps: [step-2]
+    outputs: ["src/store/"]
+
+  - id: step-6
+    name: 全量回归测试
+    status: blocked
+    deps: [step-3, step-4, step-5]
+    outputs: ["docs/admin-refactor/test-report.md"]
 
 sessions:
-  - date: 2026-06-29
-    summary: "确认方案，完成第1步（国际化调研）。第2步进行中。下次继续支付整合。"
-  - date: 2026-06-30
-    summary: "第2步完成。第1步锁定。下次开始第3步汇率结算。"
+  - date: 2026-07-02
+    summary: "确认渐进式重构方案，6 步拆解。第 1-4 步可并行。下次从第 1 步开始。"
+  - date: 2026-07-03
+    summary: "第 1 步（分析+选型）完成。第 2 步（公共组件）进行中。下次继续第 2 步。"
 ```
 
 ---
@@ -106,13 +117,13 @@ sessions:
 ```yaml
 # ✅ 好：精简，有关键决策和约束
 context: |
-  电商多语言改造。决策：i18next+ICU，Stripe+Adyen。
-  约束：首屏增量<200ms，先东南亚后欧洲。
+  后台管理系统重构。决策：React 18 + Zustand。
+  约束：不能中断业务，每次只迁移一个模块。
 
 # ❌ 差：太长，每次 /project 都加载浪费 token
 context: |
-  我们公司成立于2018年，主营跨境电商，目前有120万用户...
-  （500字的背景故事）
+  我们公司成立于2018年，主营电商，目前有120万用户，
+  后台系统是2019年用 Vue2 写的……（500 字的背景故事）
 ```
 
 ### 2. 命名规范
@@ -120,8 +131,8 @@ context: |
 ```yaml
 # ✅ 推荐：短横线命名，可读
 id: step-1
-id: payment-integration
-id: perf-benchmark
+id: component-extraction
+id: state-migration
 
 # ⚠️ 可用但不推荐：太短，语义不清
 id: s1
@@ -136,9 +147,10 @@ id: p2
 
 ### 4. outputs 路径
 
-- 使用相对项目根目录的路径：`docs/specs/architecture.md`
+- 使用相对项目根目录的路径：`docs/admin-refactor/analysis.md`
 - 不要用 `~` 或绝对路径
 - 每步 1-3 个产出文件为宜
+- outputs 可以为空数组 `[]`（纯调研/讨论步骤不需要产出文件）
 
 ### 5. sessions 维护
 

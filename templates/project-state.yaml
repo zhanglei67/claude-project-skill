@@ -4,7 +4,7 @@
 # ============================================================
 
 name: my-project
-created: 2026-06-30
+created: 2026-07-02
 
 # ── 项目背景（每次 /project 都会加载此段）──
 # 写清楚：要做什么、关键决策、约束条件。控制在 200 字以内。
@@ -20,7 +20,7 @@ context: |
 # ── 步骤定义（DAG）──
 # status: done | in_progress | blocked | pending
 # deps: 依赖的步骤 id 列表，全部 done 后本步骤才可开始
-# outputs: 产出文件的相对路径列表
+# outputs: 产出文件的相对路径列表（可以为空数组 []）
 # summary: 完成后的一句话摘要
 steps:
   - id: step-1
@@ -31,13 +31,20 @@ steps:
     summary: ""
 
   - id: step-2
-    name: 另一个步骤
+    name: 可并行的步骤
     status: pending
-    deps: [step-1]          # ← 依赖步骤1完成
+    deps: []                 # ← 无依赖，可以和 step-1 并行推进
+    outputs: []
+    summary: ""
+
+  - id: step-3
+    name: 依赖前两步的步骤
+    status: blocked
+    deps: [step-1, step-2]   # ← 依赖 step-1 和 step-2 都完成
     outputs: []
     summary: ""
 
 # ── 会话记录 ──
 sessions:
-  # - date: 2026-06-30
+  # - date: 2026-07-02
   #   summary: 做了什么 + 产出 + 下次从哪开始
