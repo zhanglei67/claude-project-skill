@@ -8,11 +8,11 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `name` | `string` | ✅ | 项目名称，与文件名一致（不含 `.yaml`）。用作 `/project` 的标识 |
+| `name` | `string` | ✅ | 项目名称，与文件名一致（不含 `.yaml`） |
 | `created` | `date` | ✅ | 创建日期，格式 `YYYY-MM-DD` |
 | `context` | `string` | ✅ | 项目背景和关键决策。**每次 `/project` 都会加载（L1）。控制在 200 字以内** |
 | `steps` | `Step[]` | ✅ | 步骤列表，按执行顺序排列。支持 DAG 依赖 |
-| `sessions` | `Session[]` | ❌ | 会话记录。每次收尾时追加 |
+| `sessions` | `Session[]` | ❌ | 会话记录。「保存 N」时追加 |
 
 ---
 
@@ -22,23 +22,51 @@
 |------|------|------|------|
 | `id` | `string` | ✅ | 唯一标识，格式 `step-N` 或 `短横线命名`。被 `deps` 引用 |
 | `name` | `string` | ✅ | 步骤名称，用于汇报显示 |
-| `status` | `enum` | ✅ | `pending`（未开始）\| `in_progress`（进行中）\| `done`（已完成）\| `blocked`（阻塞） |
-| `deps` | `string[]` | ✅ | 依赖的步骤 `id` 列表。所有依赖为 `done` 时本步骤才可从 `blocked` 变为可开始 |
-| `outputs` | `string[]` | ✅ | 产出文件路径列表（相对项目根目录）。`done` 时 `/project` 会检测文件是否存在 |
-| `summary` | `string` | ✅ | 一句话摘要。`done` 时建议填写，作为 L2 上下文注入 |
+| `status` | `enum` | ✅ | `pending` \| `in_progress` \| `done` \| `blocked` |
+| `deps` | `string[]` | ✅ | 依赖的步骤 `id` 列表。所有依赖为 `done` 时本步骤才可开始 |
+| `outputs` | `string[]` | ✅ | 产出文件路径列表。`完成 N` 时检测文件是否存在。可以为空数组 `[]` |
+| `summary` | `string` | ✅ | 一句话摘要。`完成 N` 时填写，作为 L2 上下文注入 |
+| `checkpoint` | `Checkpoint` | ❌ | **仅 `in_progress` 时存在**。`保存 N` 创建，`完成 N` 自动清除 |
+
+### Checkpoint 子字段
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `done` | `string` | ✅ | 已完成的具体事项，分点列表。「保存 N」时从对话提取 |
+| `remaining` | `string` | ✅ | 待完成的具体事项。下次「继续 N」时注入为工作议程 |
+| `notes` | `string` | ❌ | 过程中发现的问题、决策、踩坑。无内容则不写 |
+
+### 字段生命周期
+
+```
+pending ──→ in_progress ──→ done
+                │                │
+                │ checkpoint     │ checkpoint 清除
+                │ ← 「保存 N」    │ summary 写入
+                │                 │ outputs 锁定
+                │                 │
+                └── 多次会话 ────┘
+                   「继续 N」注入断点
+                   「保存 N」更新断点
+```
+
+- **checkpoint**：步骤内部的状态序列化。`保存 N` 创建/更新，`完成 N` 清除
+- **summary**：步骤完成后的结项摘要。`完成 N` 时写入
+- **outputs**：最终交付物。`完成 N` 时验证
 
 ### status 状态机
 
 ```
 pending ──→ in_progress ──→ done
-   │                           ↑
-   └────→ blocked ─────────────┘
-            (deps 满足后由 /project 提示解锁)
+   │            ↑              ↑
+   └────→ blocked ────────────┘
+            (deps 满足后解锁)
 ```
 
-- `blocked` 由用户或 `/project` 根据依赖关系设置
-- `blocked → in_progress` 由 `/project` 检测依赖满足后提示，用户确认
-- `done` 后不可逆（如需重做，新建步骤或手动编辑 YAML）
+- `blocked` 根据依赖关系设置
+- `继续 N` 将 `pending` 或 `blocked`（依赖满足）→ `in_progress`
+- `pending → done` 允许跳过 `in_progress`（用户可能直接 `完成 N`）
+- `done` 后不可逆
 
 ---
 
@@ -47,7 +75,7 @@ pending ──→ in_progress ──→ done
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `date` | `date` | ✅ | 日期 `YYYY-MM-DD` |
-| `summary` | `string` | ✅ | 本次做了什么 + 产出 + 下次从哪开始。2-3 句话即可 |
+| `summary` | `string` | ✅ | 本次做了什么 + 产出 + 下次从哪开始。2-3 句话 |
 
 ---
 
@@ -78,10 +106,19 @@ steps:
 
   - id: step-3
     name: 用户管理模块迁移
-    status: done
+    status: in_progress
     deps: []
     outputs: ["src/pages/user/"]
-    summary: "用户列表/详情/权限分配 3 页面迁移完成"
+    checkpoint:
+      done: |
+        - 用户列表页 UI（搜索框 + 分页组件）
+        - GET /users API 对接
+      remaining: |
+        - 用户详情页（UI + GET /users/:id）
+        - 权限分配页面
+        - 批量操作（启用/禁用）
+      notes: |
+        - API 返回格式从 {data, total} 改成了 {items, count}
 
   - id: step-4
     name: 数据报表模块迁移
@@ -103,9 +140,9 @@ steps:
 
 sessions:
   - date: 2026-07-02
-    summary: "确认渐进式重构方案，6 步拆解。第 1-4 步可并行。下次从第 1 步开始。"
+    summary: "确认渐进式重构方案，6 步拆解。第 1-4 步可并行。"
   - date: 2026-07-03
-    summary: "第 1 步（分析+选型）完成。第 2 步（公共组件）进行中。下次继续第 2 步。"
+    summary: "第 1 步和第 2 步完成。第 3 步用户模块进行中——列表页完成，详情页和权限分配待做。"
 ```
 
 ---
@@ -122,51 +159,60 @@ context: |
 
 # ❌ 差：太长，每次 /project 都加载浪费 token
 context: |
-  我们公司成立于2018年，主营电商，目前有120万用户，
-  后台系统是2019年用 Vue2 写的……（500 字的背景故事）
+  我们公司成立于2018年，主营电商，目前有120万用户……（500 字背景故事）
 ```
 
-### 2. 命名规范
-
-```yaml
-# ✅ 推荐：短横线命名，可读
-id: step-1
-id: component-extraction
-id: state-migration
-
-# ⚠️ 可用但不推荐：太短，语义不清
-id: s1
-id: p2
-```
-
-### 3. 步骤拆解粒度
+### 2. 步骤拆解粒度
 
 - 一个步骤 = 一次会话能完成的工作量
 - 如果某步产出 > 3 个文件，考虑拆分为多步
 - 依赖链太长（>4 步串行）时，检查是否有隐藏的并行机会
 
-### 4. outputs 路径
+### 3. outputs 路径
 
-- 使用相对项目根目录的路径：`docs/admin-refactor/analysis.md`
-- 不要用 `~` 或绝对路径
+- 使用相对项目根目录的路径
 - 每步 1-3 个产出文件为宜
-- outputs 可以为空数组 `[]`（纯调研/讨论步骤不需要产出文件）
+- outputs 可以为空数组 `[]`（纯调研/讨论步骤）
 
-### 5. sessions 维护
+### 4. checkpoint 写法
 
-- 只在「今天就到这」时追加
-- 每次 2-3 句话：做了什么 + 产出什么 + 下次从哪开始
-- 不要写流水账——这是凝练的抓手，不是对话记录
+- **done/remaining 用分点列表**，每点一句话
+- **只写具体事项**，不写模糊描述
+  - ✅ "列表页查询性能优化，从 2s 降到 200ms"
+  - ❌ "做了一些优化"
+- **remaining 保持可操作**——下次「继续 N」能直接当工作议程
+- **notes 只记有用的**：踩坑、API 变更、未决问题
+- **控制在 300 字以内**。步骤完成即清除，不是永久文档
+
+```yaml
+# ✅ 好：具体、可操作
+checkpoint:
+  done: |
+    - 列表页 UI（搜索框 + 分页）
+    - GET /users API 对接
+  remaining: |
+    - 用户详情页（UI + GET /users/:id）
+    - 权限分配页面
+  notes: |
+    - API 返回格式改了：{data, total} → {items, count}
+
+# ❌ 差：模糊、不可操作
+checkpoint:
+  done: |
+    - 做了一些前端工作
+  remaining: |
+    - 继续开发
+```
 
 ---
 
 ## 验证清单
 
-在保存或修改状态文件前，确认：
-
-- [ ] `name` 与文件名一致？
-- [ ] 所有 `deps` 中引用的 `id` 在 `steps` 中存在？
-- [ ] 无循环依赖？（`step-1 → step-2 → step-1`）
-- [ ] `context` 在 200 字以内？
-- [ ] 所有 `done` 步骤的 `outputs` 文件真实存在？
-- [ ] `sessions` 最新一条记录是最近一次会话？
+- [ ] `name` 与文件名一致
+- [ ] 所有 `deps` 引用的 `id` 在 `steps` 中存在
+- [ ] 无循环依赖（`step-1 → step-2 → step-1`）
+- [ ] `context` 在 200 字以内
+- [ ] 所有 `done` 步骤的 `outputs` 文件真实存在
+- [ ] `in_progress` 步骤的 `checkpoint` 内容来自用户确认
+- [ ] `done` 步骤的 `checkpoint` 已清除
+- [ ] `sessions` 最新记录是最近一次会话

@@ -21,7 +21,11 @@ context: |
 # status: done | in_progress | blocked | pending
 # deps: 依赖的步骤 id 列表，全部 done 后本步骤才可开始
 # outputs: 产出文件的相对路径列表（可以为空数组 []）
-# summary: 完成后的一句话摘要
+# summary: 「完成 N」时的一句话摘要
+# checkpoint: 「保存 N」时创建的步骤内断点，仅 in_progress 时存在，「完成 N」后清除
+#   checkpoint.done: 已完成的具体事项
+#   checkpoint.remaining: 待完成的具体事项
+#   checkpoint.notes: 中途发现/决策（可选）
 steps:
   - id: step-1
     name: 步骤名称
@@ -43,6 +47,23 @@ steps:
     deps: [step-1, step-2]   # ← 依赖 step-1 和 step-2 都完成
     outputs: []
     summary: ""
+
+# ── checkpoint 示例（使用「保存 N」时自动生成）──
+#  - id: step-4
+#    name: 复杂步骤
+#    status: in_progress
+#    deps: [step-3]
+#    outputs: ["docs/output.md"]
+#    summary: ""
+#    checkpoint:
+#      done: |
+#        - 子任务A 完成
+#        - 子任务B 完成
+#      remaining: |
+#        - 子任务C
+#        - 子任务D
+#      notes: |  # 可选
+#        - 过程中发现的问题或决策
 
 # ── 会话记录 ──
 sessions:
